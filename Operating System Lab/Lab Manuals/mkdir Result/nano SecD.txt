@@ -1,0 +1,14 @@
+echo "Just because it took you longer than others, doesn't mean you failed."
+echo "Marks only judges how well you perform within allotted time. It is a measure of time not your capability."
+
+cp https://docs.google.com/spreadsheets/d/1jc7ziAbOqNmVVsohhkVDkEHzoQVHUNYgO6RlxxjTnQw/edit#gid=0 GoogleChrome
+
+#You can only view it
+chmod 740 https://docs.google.com/spreadsheets/d/1jc7ziAbOqNmVVsohhkVDkEHzoQVHUNYgO6RlxxjTnQw/edit#gid=0
+
+#I am the owner - You are the member of Group (NU) - Others can't access it
+
+ls -l https://docs.google.com/spreadsheets/d/1jc7ziAbOqNmVVsohhkVDkEHzoQVHUNYgO6RlxxjTnQw/edit#gid=0
+-rwxr----- Sumaiyah NU
+
+echo "Besto!"
