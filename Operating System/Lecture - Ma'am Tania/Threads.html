@@ -1,0 +1,358 @@
+
+<!-- saved from url=(0073)https://www.cs.uic.edu/~jbell/CourseNotes/OperatingSystems/4_Threads.html -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <meta name="GENERATOR" content="Adobe PageMill 3.0 Win">
+  <title>Operating Systems: Threads</title><style type="text/css">
+<!--
+.style1 {
+	font-family: "Courier New", Courier, monospace;
+	font-weight: bold;
+}
+-->
+  </style></head>
+<body bgcolor="#ffff80">
+
+<h1><center>
+  Threads
+</center></h1>
+
+<h3>References:</h3>
+
+<ol>
+  <li>Abraham Silberschatz, Greg Gagne, and Peter Baer Galvin, "Operating System Concepts, Ninth Edition ", Chapter 4
+</li></ol>
+
+<h3>4.1 Overview</h3>
+<ul>
+  <li>A <em><strong>thread</strong></em> is a basic unit of CPU utilization, consisting of a program counter, a stack, and a set of registers, ( and a thread ID. ) </li>
+  <li>Traditional ( heavyweight ) processes have a single thread of control - There is one program counter, and one sequence of instructions that can be carried out at any given time.</li>
+  <li>As shown in Figure 4.1, multi-threaded applications have multiple threads within a single process, each having their own program counter, stack and set of registers, but sharing common code, data, and certain structures such as open files. </li>
+</ul>
+<p align="center"><img src="./Threads_files/4_01_ThreadDiagram.jpg" width="704" height="406"><br>
+  <strong>Figure 4.1 - Single-threaded and multithreaded processes</strong>
+</p>
+<blockquote>
+  <h4>4.1.1 Motivation</h4>
+  <ul>
+    <li>Threads are very useful in modern programming whenever a process has multiple tasks to perform independently of the others.</li>
+    <li>This is particularly true when one of the tasks may block, and it is desired to allow the other tasks to proceed without blocking.</li>
+    <li>For example in a word processor, a background thread may check spelling and grammar while a foreground thread processes user input ( keystrokes ), while yet a third   thread loads images from the hard drive, and a fourth does periodic automatic backups of the file being edited.</li>
+    <li>Another example is a web server - Multiple threads allow for multiple requests to be satisfied simultaneously, without having to service requests sequentially or to fork off separate processes for every incoming request. ( The latter is how this sort of thing was done before the concept of threads was developed. A daemon would listen at a port, fork off a child for every incoming request to be processed, and then go back to listening to the port. ) </li>
+  </ul>
+  <p align="center"><img src="./Threads_files/4_02_MultithreadedArchitecture.jpg" width="632" height="227"><br>
+    <strong>Figure 4.2 - Multithreaded server architecture</strong>
+  </p>
+  <h4>4.1.2 Benefits</h4>
+  <ul>
+    <li>There are four major categories of benefits to multi-threading:
+      <ol>
+        <li>Responsiveness - One thread may provide rapid response while other threads are blocked or slowed down doing intensive calculations.</li>
+        <li>Resource sharing - By default threads share common code, data, and other resources, which allows multiple tasks to be performed simultaneously in a single address space.</li>
+        <li>Economy - Creating and managing threads ( and context switches between them ) is much faster than performing the same tasks for processes.</li>
+        <li>Scalability, i.e. Utilization of multiprocessor architectures - A single threaded process can only run on one CPU, no matter how many may be available, whereas the execution of a multi-threaded application may be split amongst available processors. ( Note that single threaded processes can still benefit from multi-processor architectures when there are multiple processes contending for the CPU, i.e. when the load average is above some certain threshold. )   </li>
+      </ol>
+    </li>
+  </ul>
+</blockquote>
+<h3>4.2 Multicore Programming </h3>
+<ul>
+  <li>A recent trend in computer architecture is to produce chips with multiple <em><strong>cores</strong></em>, or CPUs on a single chip.</li>
+  <li>A multi-threaded application running on a traditional single-core chip would have to interleave the threads, as shown in Figure 4.3. On a multi-core chip, however, the threads could be spread across the available cores, allowing true parallel processing, as shown in Figure 4.4.</li>
+</ul>
+<p align="center"><img src="./Threads_files/4_03_ConcurrentSingleCore.jpg" width="825" height="93"><br>
+  <strong>Figure 4.3 - Concurrent execution on a single-core system.</strong>
+</p>
+<p align="center"><img src="./Threads_files/4_04_ParralelMulticore.jpg" width="500" height="174"><br>
+  <strong>Figure 4.4 - Parallel execution on a multicore system</strong>
+</p>
+<ul>
+  <li>For operating systems, multi-core chips require new scheduling algorithms to make better use of the multiple cores available.</li>
+  <li>As multi-threading becomes more pervasive and more important ( thousands instead of tens of threads ), CPUs have been developed to support more simultaneous threads per core in hardware.</li>
+</ul>
+<blockquote>
+  <h4>4.2.1 Programming Challenges ( New section, same content ? )</h4>
+  <ul>
+    <li>For application programmers, there are five areas where multi-core chips present new challenges:
+      <ol>
+        <li><strong>Identifying tasks</strong> - Examining applications to find activities that can be performed concurrently.</li>
+        <li><strong>Balance</strong> - Finding tasks to run concurrently that provide equal value. I.e. don't waste a thread on trivial tasks.</li>
+        <li><strong>Data splitting</strong> - To prevent the threads from interfering with one another.</li>
+        <li><strong>Data dependency</strong> - If one task is dependent upon the results of another, then the tasks need to be synchronized to assure access in the proper order.</li>
+        <li><strong>Testing and debugging</strong> - Inherently more difficult in parallel processing situations, as the race conditions become much more complex and difficult to identify.</li>
+      </ol>
+    </li>
+  </ul>
+<h4>4.2.2 Types of Parallelism ( new )</h4>
+<blockquote>
+  <p>In theory there are two different ways to parallelize the workload:</p>
+  <ol>
+    <li><strong>Data parallelism</strong> divides the data up amongst multiple cores ( threads ), and performs the same task on each subset of the data. For example dividing a large image up into pieces and performing the same digital image processing on each piece on different cores.</li>
+    <li><strong>Task parallelism</strong> divides the different tasks to be performed among the different cores and performs them simultaneously.</li>
+  </ol>
+  <p>In practice no program is ever divided up solely by one or the other of these, but instead by some sort of hybrid combination.</p>
+</blockquote>
+</blockquote>
+<h3>4.3 Multithreading Models </h3>
+<ul>
+  <li>There are two types of threads to be managed in a modern system: User threads and kernel threads.</li>
+  <li>User threads are supported above the kernel, without kernel support. These are the threads that  application programmers would put into their programs. </li>
+  <li>Kernel threads are supported within the kernel of the OS itself. All modern OSes support kernel level threads, allowing the kernel to perform multiple simultaneous tasks and/or to service multiple kernel system calls simultaneously.</li>
+  <li>In a specific implementation, the user threads must be mapped to kernel threads, using one of the following strategies.    </li>
+</ul>
+<blockquote>
+  <h4>4.3.1 Many-To-One Model</h4>
+  <ul>
+    <li>In the many-to-one model, many user-level threads are all mapped onto a single kernel thread.</li>
+    <li>Thread management is handled by the thread library in user space, which is very efficient.</li>
+    <li>However, if a blocking system call is made, then the entire process blocks, even if the other user threads would otherwise be able to continue.   </li>
+    <li>Because a single kernel thread can operate only on a single CPU, the many-to-one model does not allow individual processes to be split across multiple CPUs. </li>
+    <li>Green threads for Solaris and GNU Portable Threads implement the many-to-one model in the past, but few systems continue to do so today.</li>
+  </ul>
+  <p align="center"><img src="./Threads_files/4_05_ManyToOne.jpg" width="403" height="398"><br>
+  <strong>Figure 4.5 - Many-to-one model</strong></p>
+  <h4>4.3.2 One-To-One Model</h4>
+  <ul>
+    <li>The one-to-one model creates a separate kernel thread to handle each user thread.</li>
+    <li>One-to-one model overcomes the problems listed above involving blocking system calls and the splitting of processes across multiple CPUs.</li>
+    <li>However the overhead of managing the one-to-one   model is more significant, involving more overhead and slowing down the system.</li>
+    <li>Most implementations of this model place a limit on how many threads can be created.</li>
+    <li>Linux and Windows from 95 to XP implement the one-to-one model for threads. </li>
+  </ul>
+  <p align="center"><img src="./Threads_files/4_06_OneToOne.jpg" width="494" height="187"><br>
+  <strong>Figure 4.6 - One-to-one model</strong></p>
+  <h4>4.3.3 Many-To-Many Model</h4>
+  <ul>
+    <li>The many-to-many model multiplexes any number of user threads onto an equal or smaller number of kernel threads, combining the best features of the one-to-one and many-to-one models.</li>
+    <li>Users have no restrictions on the number of threads created.</li>
+    <li>Blocking kernel system calls do not block the entire process.</li>
+    <li>Processes can be split across multiple processors.</li>
+    <li>Individual processes may be allocated variable numbers of kernel threads, depending on the number of CPUs present and other factors.   </li>
+  </ul>
+  <p align="center"><img src="./Threads_files/4_07_ManyToMany.jpg" width="469" height="399"><br>
+  <strong>Figure 4.7 - Many-to-many model</strong></p>
+  <ul>
+    <li>One popular variation of the many-to-many model is the two-tier model, which allows either many-to-many or one-to-one operation.</li>
+    <li>IRIX, HP-UX, and Tru64 UNIX use the two-tier model, as did Solaris prior to Solaris 9.  </li>
+  </ul>
+  <p align="center"><img src="./Threads_files/4_08_TwoLevel.jpg" width="597" height="401"><br>
+  <strong>Figure 4.8 - Two-level model</strong></p>
+</blockquote>
+<h3>4.4 Thread Libraries </h3>
+<ul>
+  <li>Thread libraries provide programmers with an API for creating and managing threads.</li>
+  <li>Thread libraries may be implemented either in user space or in kernel space. The former involves API functions implemented solely within user space, with no kernel support. The latter involves system calls, and requires a kernel with thread library support.</li>
+  <li>There are three main thread libraries in use today:
+    <ol>
+      <li>POSIX Pthreads - may be provided as either a user or kernel library, as an extension to the POSIX standard. </li>
+      <li>Win32 threads - provided as a kernel-level library on Windows systems. </li>
+      <li>Java threads     - Since Java generally runs on a Java Virtual Machine, the implementation of threads is based upon whatever OS and hardware the JVM is running on, i.e. either Pthreads or Win32 threads depending on the system.</li>
+    </ol>
+  </li>
+  <li>The following sections will demonstrate the use of threads in all three systems for calculating the sum of integers from 0 to N in a separate thread, and storing the result in a variable "sum".  </li>
+</ul>
+<blockquote>
+  <h4>4.4.1 Pthreads</h4>
+  <ul>
+    <li>The POSIX standard ( IEEE 1003.1c ) defines the <em>specification</em> for pThreads, not the <em>implementation</em>.</li>
+    <li>pThreads are available on Solaris, Linux, Mac OSX, Tru64, and via public domain shareware for Windows.</li>
+    <li>Global variables are shared amongst all threads.</li>
+    <li>One thread can wait for the others to rejoin before continuing.  </li>
+    <li>pThreads begin execution in a specified function, in this example the runner( ) function: </li>
+  </ul>
+  <p align="center"><img src="./Threads_files/4_09_PThreadsAPI.jpg" width="724" height="1113"><br>
+  <strong>Figure 4.9</strong></p>
+  <p align="center"><img src="./Threads_files/4_10_JoiningPThreads.jpg" width="560" height="254"><br>
+    <strong>New</strong>
+  </p>
+  <h4>4.4.2 Windows Threads</h4>
+  <ul>
+    <li>Similar to pThreads. Examine the code example to see the differences, which are mostly syntactic &amp; nomenclature: </li>
+  </ul>
+  <p align="center"><img src="./Threads_files/4_10_Win32API.jpg" width="764" height="1290"><br>
+  <strong>Figure 4.11 </strong></p>
+  <h4>4.4.3 Java Threads</h4>
+  <ul>
+    <li>ALL Java programs use Threads - even "common" single-threaded ones. </li>
+    <li>The creation of new Threads requires Objects that implement the Runnable Interface, which means they contain a method "public void run( )" . Any descendant of the Thread class will naturally contain such a method. ( In practice the run( ) method must be overridden / provided for the thread to have any practical functionality. )</li>
+    <li>Creating a Thread Object does not start the thread running - To do that the program must call the Thread's "start( )" method. Start( ) allocates and initializes memory for the Thread, and then calls the run( ) method. ( Programmers do not call run( ) directly. )</li>
+    <li>Because Java does not support global variables, Threads must be passed a reference to a shared Object in order to share data, in this example the "Sum" Object.</li>
+    <li>Note that the JVM runs on top of a native OS, and that the JVM specification does not specify what model to use for mapping Java threads to kernel threads. This decision is JVM implementation dependant, and may be one-to-one, many-to-many, or many to one.. ( On a UNIX system the JVM normally uses PThreads and on a Windows system it normally uses windows threads. )</li>
+  </ul>
+  <p align="center"><img src="./Threads_files/4_11_JavaThreads.jpg" width="784" height="1304"><br>
+    <strong>Figure 4.12</strong>
+  </p>
+</blockquote>
+<h3>4.5 Implicit Threading ( Optional )</h3>
+<blockquote>
+  <p>Shifts the burden of addressing the programming challenges outlined in section 4.2.1 above from the application programmer to the compiler and run-time libraries.</p>
+  <h4>4.5.1 Thread Pools </h4>
+  <ul>
+    <li>Creating new threads every time one is needed and then deleting it when it is done can be inefficient, and can also lead to a very large ( unlimited ) number of threads being created.</li>
+    <li>An alternative solution is to create a number of threads when the process first starts, and put those threads into a <em><strong>thread pool</strong></em>.
+      <ul>
+        <li>Threads are allocated from the pool as needed, and returned to the pool when no longer needed.</li>
+        <li>When no threads are available in the pool, the process may have to wait until one becomes available. </li>
+      </ul>
+    </li>
+    <li>The ( maximum ) number of threads available in a thread pool may be determined by adjustable parameters, possibly dynamically in response to changing system loads. </li>
+    <li>Win32 provides thread pools through the "PoolFunction" function. Java also provides support for thread pools through the java.util.concurrent package, and Apple supports thread pools under the Grand Central Dispatch architecture.. </li>
+  </ul>
+  <h4>4.5.2 OpenMP</h4>
+  <ul>
+    <li>OpenMP is a set of compiler directives available for C, C++, or FORTRAN programs that instruct the compiler to automatically generate parallel code where appropriate.</li>
+    <li>For example, the directive:</li>
+  </ul>
+  <blockquote>
+    <pre>      #pragma omp parallel 
+       {
+             /* some parallel code here */
+       }</pre>
+    <p>      would cause the compiler to create as many threads as the machine has cores available, ( e.g. 4 on a quad-core machine ), and to run the parallel block of code, ( known as a <strong>parallel region</strong> ) on each of the threads.</p>
+  </blockquote>
+  <ul>
+    <li>Another sample directive is "<span class="style1">#pragma omp parallel for</span>", which causes the for loop immediately following it to be parallelized, dividing the iterations up amongst the available cores.</li>
+  </ul>
+  <h4>4.5.3 Grand Central Dispatch, GCD</h4>
+  <ul>
+    <li>GCD is an extension to C and C++ available on Apple's OSX and iOS operating systems to support parallelism.</li>
+    <li>Similar to OpenMP, users of GCD define <strong>blocks</strong> of code to be executed either serially or in parallel by placing a carat just before an opening curly brace, i.e.<span class="style1"> ^{ printf( "I am a block.\n" ); }</span></li>
+    <li>GCD schedules blocks by placing them on one of several <strong>dispatch queues</strong>.
+      <ul>
+        <li>Blocks placed on a serial queue are removed one by one. The next block cannot be removed for scheduling until the previous block has completed.</li>
+        <li>There are three concurrent queues, corresponding roughly to low, medium, or high priority. Blocks are also removed from these queues one by one, but several may be removed and dispatched without waiting for others to finish first, depending on the availability of threads.</li>
+      </ul>
+    </li>
+    <li>Internally GCD manages a pool of POSIX threads which may fluctuate in size depending on load conditions.</li>
+  </ul>
+  <h4>4.5.4 Other Approaches</h4>
+  <blockquote>
+    <p>There are several other approaches available, including Microsoft's Threading Building Blocks ( TBB ) and other products, and Java's util.concurrent package.</p>
+  </blockquote>
+</blockquote>
+<h3>4.6 Threading Issues </h3>
+<blockquote>
+  <h4>4.6.1 The fork( ) and exec( ) System Calls</h4>
+  <ul>
+    <li>Q: If one thread forks, is the entire process copied, or is the new process single-threaded? </li>
+    <li>A: System dependant.</li>
+    <li>A: If the new process execs right away, there is no need to copy all the other threads. If it doesn't, then the entire process should be copied.</li>
+    <li>A: Many versions of UNIX provide multiple versions of the fork call for this purpose. </li>
+  </ul>
+  <h4>4.6.2 Signal Handling</h4>
+  <ul>
+    <li>Q: When a multi-threaded process receives a signal, to what thread should that signal be delivered?</li>
+    <li>A: There are four major options:
+      <ol>
+        <li>Deliver the signal to the thread to which the signal applies.</li>
+        <li>Deliver the signal to every thread in the process.</li>
+        <li>Deliver the signal to certain threads in the process.</li>
+        <li>Assign a specific thread to receive all signals in a process.</li>
+      </ol>
+    </li>
+    <li>The best choice may depend on which specific signal is involved.</li>
+    <li>UNIX allows individual threads to indicate which signals they are accepting and which they are ignoring. However the signal can only be delivered to one thread, which is generally the first thread that is accepting that particular signal.</li>
+    <li>UNIX provides two separate system calls, <span class="style1">kill( pid, signal )</span> and <span class="style1">pthread_kill( tid, signal )</span>, for delivering signals to processes or specific threads respectively.</li>
+    <li>Windows does not support signals, but they can be emulated using Asynchronous Procedure Calls ( APCs ). APCs are delivered to specific threads, not processes. </li>
+  </ul>
+  <h4>4.6.3 Thread Cancellation</h4>
+  <ul>
+    <li>Threads that are no longer needed may be cancelled by another thread in one of two ways:
+      <ol>
+        <li><strong>Asynchronous Cancellation</strong> cancels the thread immediately.</li>
+        <li><strong>Deferred Cancellation</strong> sets a flag indicating the thread should cancel itself when it is convenient. It is then up to the cancelled thread to check this flag periodically and exit nicely when it sees the flag set.</li>
+      </ol>
+    </li>
+    <li>( Shared ) resource allocation and inter-thread data transfers can be problematic with asynchronous cancellation. </li>
+  </ul>
+<h4>4.6.4 Thread-Local Storage ( was 4.4.5 Thread-Specific Data )</h4>
+  <ul>
+    <li>Most data is shared among threads, and this is one of the major benefits of using threads in the first place.</li>
+    <li>However sometimes threads need thread-specific data also.</li>
+    <li>Most major thread libraries ( pThreads, Win32, Java ) provide support for thread-specific data, known as <strong>thread-local storage</strong> or <strong>TLS.</strong> Note that this is more like static data than local variables,because it does not cease to exist when the function ends.  </li>
+  </ul>
+  <h4>4.6.5 Scheduler Activations</h4>
+  <ul>
+    <li>Many implementations of threads provide a virtual processor as an interface between the user thread and the kernel thread, particularly for the many-to-many or two-tier models.</li>
+    <li>This virtual processor is known as a "Lightweight Process", LWP.
+      <ul>
+        <li>There is a one-to-one correspondence between LWPs and kernel threads. </li>
+        <li>The number of kernel threads available, ( and hence the number of LWPs ) may change dynamically.</li>
+        <li>The application ( user level thread library ) maps user threads onto available LWPs. </li>
+        <li>kernel threads are scheduled onto the real processor(s) by the OS. </li>
+        <li>The kernel communicates to the user-level thread library when certain events occur ( such as a thread about to block ) via an <em><strong>upcall</strong></em>, which is handled in the thread library by an <em><strong>upcall handler</strong></em>. The upcall also provides a new LWP for the upcall handler to run on, which it can then use to reschedule the user thread that is about to become blocked. The OS will also issue upcalls when a thread becomes unblocked, so the thread library can make appropriate adjustments.  </li>
+      </ul>
+    </li>
+    <li>If the kernel thread blocks, then the LWP blocks, which blocks the user thread.</li>
+    <li>Ideally there should be at least as many LWPs available as there could be concurrently blocked kernel threads.  Otherwise if all LWPs are blocked, then user threads will have to wait for one to become available. </li>
+  </ul>
+  <p align="center"><img src="./Threads_files/4_13_Lightweight.jpg" width="304" height="275"><br>
+  <strong>Figure 4.13 - Lightweight process ( LWP )</strong></p>
+</blockquote>
+<h3>4.7 Operating-System Examples ( Optional )</h3>
+<blockquote>
+  <h4>4.7.1 Windows XP Threads</h4>
+  <ul>
+    <li>The Win32 API thread library supports the one-to-one thread model</li>
+    <li>Win32 also provides the <em><strong>fiber</strong></em> library, which supports the many-to-many model.</li>
+    <li>Win32 thread components include:
+      <ul>
+        <li>Thread ID</li>
+        <li>Registers</li>
+        <li>A user stack used in user mode, and a kernel stack used in kernel mode.   </li>
+        <li>A private storage area used by various run-time libraries and dynamic link libraries ( DLLs ).</li>
+      </ul>
+    </li>
+    <li>The key data structures for Windows threads are the ETHREAD ( executive thread block  ), KTHREAD ( kernel thread block ), and the TEB ( thread environment block ). The ETHREAD and KTHREAD structures exist entirely within kernel space, and hence are only accessible by the kernel, whereas the TEB lies within user space, as illustrated in Figure 4.10: </li>
+  </ul>
+  <p align="center"><img src="./Threads_files/4_14_WindowsThreadStructures.jpg" width="652" height="633"><br>
+  <strong>Figure 4.14 - Data structures of a Windows thread</strong></p>
+  <h4>4.7.2 Linux Threads               </h4>
+  <ul>
+    <li>Linux does not distinguish between processes and threads - It uses the more generic term "tasks".</li>
+    <li>The traditional fork( ) system call completely duplicates a process ( task ), as described earlier.</li>
+    <li>An alternative system call, clone( )   allows for varying degrees of sharing between the parent and child tasks, controlled by flags such as those shown in the following table:</li>
+  </ul>
+  <blockquote>
+  <center>
+    <table width="400" border="1" cellspacing="5" cellpadding="2">
+      <caption>&nbsp;
+      </caption>
+      <tbody><tr>
+        <th scope="col">flag</th>
+        <th scope="col">Meaning</th>
+      </tr>
+      <tr>
+        <td>CLONE_FS</td>
+        <td>File-system information is shared </td>
+      </tr>
+      <tr>
+        <td>CLONE_VM</td>
+        <td>The same memory space is shared </td>
+      </tr>
+      <tr>
+        <td>CLONE_SIGHAND</td>
+        <td>Signal handlers are shared </td>
+      </tr>
+      <tr>
+        <td>CLONE_FILES</td>
+        <td>The set of open files is shared </td>
+      </tr>
+    </tbody></table>
+    </center>
+  </blockquote>
+  <ul>
+    <li>Calling clone( )with no flags set is equivalent to fork( ). Calling clone( )  with CLONE_FS, CLONE_VM, CLONE_SIGHAND, and CLONE_FILES is equivalent to creating a thread, as all of these data structures will be shared.</li>
+    <li>Linux implements this using a structure <span class="style1">task_struct</span>, which essentially provides a level of indirection to task resources. When the flags are not set, then the resources pointed to by the structure are copied, but if the flags are set, then only the pointers to the resources are copied, and hence the resources are shared. ( Think of a deep copy versus a shallow copy in OO programming. )</li>
+    <li><strong>( Removed from 9th edition )</strong> Several distributions of Linux now support the NPTL ( Native POXIS Thread Library )
+<ul>
+        <li>POSIX compliant.</li>
+        <li>Support for SMP ( symmetric multiprocessing ), NUMA ( non-uniform memory access ), and multicore processors.</li>
+        <li>Support for hundreds to thousands of threads.</li>
+      </ul>
+    </li>
+  </ul>
+</blockquote>
+<h3>4.8 Summary        </h3>
+
+
+</body></html>
